@@ -193,7 +193,7 @@ export class VoxelEngine {
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(this.buffer.positions.slice(0, this.buffer.vertexCount * 3), 3));
     geometry.setAttribute('normal', new THREE.Float32BufferAttribute(this.buffer.normals.slice(0, this.buffer.vertexCount * 3), 3));
     geometry.setAttribute('uv', new THREE.Float32BufferAttribute(this.buffer.uvs.slice(0, this.buffer.vertexCount * 2), 2));
-    geometry.setIndex(new THREE.BufferAttribute(this.buffer.indices.slice(0, this.buffer.indexCount), 1));
+    geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(this.buffer.indices.slice(0, this.buffer.indexCount)), 1));
     geometry.computeBoundingSphere();
     const old = this.chunks.get(key);
     if (old) {

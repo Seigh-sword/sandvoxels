@@ -4,7 +4,8 @@ import fs from 'node:fs';
 
 fs.mkdirSync('artifacts', { recursive: true });
 
-const browser = await chromium.launch({ headless: true, args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
+const executablePath = process.env.SANDVOXEL_CHROMIUM || undefined;
+const browser = await chromium.launch({ headless: true, executablePath, args: ['--no-sandbox', '--enable-unsafe-swiftshader'] });
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on('pageerror', error => errors.push(error.message));
@@ -53,7 +54,7 @@ await mobile.goto('http://localhost:5173', { waitUntil: 'networkidle' });
 assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
 await mobile.getByRole('button', { name: 'Open navigation' }).tap();
 await mobile.getByRole('button', { name: 'My worlds' }).tap();
-await mobile.getByRole('button', { name: 'Play Oakwood Retreat', exact: true }).tap();
+await mobile.getByRole('button', { name: 'Play Oakwood Valley', exact: true }).tap();
 await mobile.getByRole('button', { name: 'Let us explore', exact: true }).waitFor({ timeout: 30000 });
 await mobile.getByRole('button', { name: 'Let us explore', exact: true }).tap();
 await mobile.waitForTimeout(1000);
