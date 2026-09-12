@@ -1,5 +1,13 @@
+import alpine from '../assets/alpine.png';
+import desert from '../assets/desert.png';
+import forest from '../assets/forest.png';
+import { BLOCK_NAMES, blockColors } from './engine';
+
 export type Biome = 'Forest' | 'Desert' | 'Alpine';
 export type GameMode = 'Creative' | 'Explorer';
+
+export const STORAGE_PREFIX = 'sandvoxel';
+export const storageKey = (name: string) => `${STORAGE_PREFIX}-${name}`;
 
 export interface World {
   id: string;
@@ -41,22 +49,29 @@ export const initialWorlds: World[] = [
 ];
 
 export const biomeImages: Record<Biome, string> = {
-  Forest: '/images/valley.jpg',
-  Desert: '/images/desert.jpg',
-  Alpine: '/images/snow.jpg',
+  Forest: forest,
+  Desert: desert,
+  Alpine: alpine,
 };
 
-export const blocks = [
-  { id: 1, name: 'Grass', color: '#78a450', side: '#846143' },
-  { id: 2, name: 'Dirt', color: '#99704e', side: '#755139' },
-  { id: 3, name: 'Stone', color: '#9b9d9a', side: '#737773' },
-  { id: 4, name: 'Oak log', color: '#a78859', side: '#6f5031' },
-  { id: 5, name: 'Leaves', color: '#638a43', side: '#426032' },
-  { id: 6, name: 'Sand', color: '#e0c790', side: '#bda471' },
-  { id: 7, name: 'Snow', color: '#edf4ee', side: '#b8d0d3' },
-  { id: 8, name: 'Oak planks', color: '#c59a62', side: '#99754b' },
-  { id: 9, name: 'Brick', color: '#b66c52', side: '#8f4d3c' },
-];
+export const biomeId: Record<Biome, number> = { Forest: 0, Desert: 1, Alpine: 2 };
+export const modeId: Record<GameMode, number> = { Explorer: 0, Creative: 1 };
+
+export const blocks = BLOCK_NAMES.map((name, index) => ({
+  id: index + 1,
+  name,
+  ...blockColors(index + 1),
+}));
+
+export function newId(): string {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
+  let id = '';
+  for (let i = 0; i < 32; i++) {
+    const roll = Math.floor(Math.random() * 16);
+    id += i === 12 ? '4' : i === 16 ? '89ab'[roll & 3] : roll.toString(16);
+  }
+  return `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}`;
+}
 
 export function loadLocal<T>(key: string, fallback: T): T {
   try {

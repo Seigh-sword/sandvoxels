@@ -1,0 +1,127 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  native:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-amd64
+            os: ubuntu-latest
+            kind: sdl
+            cc: cc
+            setup: sudo apt-get update && sudo apt-get install -y libsdl2-dev libgl-dev
+          - target: linux-arm64
+            os: ubuntu-latest
+            kind: soft
+            cc: aarch64-linux-gnu-gcc
+            setup: sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
+          - target: linux-riscv64
+            os: ubuntu-latest
+            kind: soft
+            cc: riscv64-linux-gnu-gcc
+            setup: sudo apt-get update && sudo apt-get install -y gcc-riscv64-linux-gnu
+          - target: windows-amd64
+            os: ubuntu-latest
+            kind: sdl-mingw
+            cc: x86_64-w64-mingw32-gcc
+            setup: |
+              sudo apt-get update && sudo apt-get install -y mingw-w64
+              curl -fsSL -o /tmp/SDL2.zip https://github.com/libsdl-org/SDL/releases/download/release-2.30.10/SDL2-devel-2.30.10-mingw.tar.gz || true
+              if [ -s /tmp/SDL2.zip ]; then tar -xzf /tmp/SDL2.zip -C /tmp; fi
+          - target: windows-arm64
+            os: ubuntu-latest
+            kind: soft
+            cc: aarch64-w64-mingw32-gcc
+            setup: sudo apt-get update && sudo apt-get install -y mingw-w64
+          - target: macos-amd64
+            os: macos-13
+            kind: sdl
+            cc: cc
+            setup: brew install sdl2
+          - target: macos-arm64
+            os: macos-14
+            kind: sdl
+            cc: cc
+            setup: brew install sdl2
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node native/tools/ts2c.mjs
+      - run: ${{ matrix.setup }}
+      - name: build sdl
+        if: matrix.kind == 'sdl'
+        run: make -C native sdl CC=${{ matrix.cc }}
+      - name: build sdl mingw
+        if: matrix.kind == 'sdl-mingw'
+        run: |
+          if [ -d /tmp/SDL2/x86_64-w64-mingw32 ]; then
+            make -C native sdl CC=${{ matrix.cc }} SDL_CFLAGS="-I/tmp/SDL2/x86_64-w64-mingw32/include" SDL_LIBS="-L/tmp/SDL2/x86_64-w64-mingw32/lib -lSDL2 -lopengl32 -mconsole"
+          else
+            make -C native soft CC=${{ matrix.cc }}
+          fi
+      - name: build soft
+        if: matrix.kind == 'soft'
+        run: make -C native soft CC=${{ matrix.cc }}
+      - name: package
+        run: |
+          mkdir -p package
+          cp LICENSE README.md package/
+          if [ -f native/build/sandvoxel ]; then cp native/build/sandvoxel package/sandvoxel-${{ matrix.target }}; fi
+          if [ -f native/build/sandvoxel-headless ]; then cp native/build/sandvoxel-headless package/sandvoxel-headless-${{ matrix.target }}; fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sandvoxel-${{ matrix.target }}
+          path: package/
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: |
+          mkdir -p package
+          cp dist/index.html package/index.html
+          cp LICENSE README.md package/
+          (cd package && zip -r ../sandvoxel-web.zip .)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sandvoxel-web
+          path: sandvoxel-web.zip
+
+  publish:
+    needs: [native, web]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - run: |
+          mkdir -p stage
+          for d in artifacts/*/; do cp -r "$d"* stage/ 2>/dev/null || true; done
+          (cd stage && zip -r ../sandvoxel-all.zip .)
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            sandvoxel-all.zip
+            artifacts/sandvoxel-web/sandvoxel-web.zip

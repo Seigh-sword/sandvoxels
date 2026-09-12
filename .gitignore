@@ -1,0 +1,9 @@
+node_modules/
+dist/
+artifacts/
+tmp-art/
+native/build/
+native/generated/
+*.ppm
+*.log
+.DS_Store

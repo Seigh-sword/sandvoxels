@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - main
+      - 'arena/**'
+  pull_request:
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: smoke test
+        run: |
+          npx vite --port 5173 --host 127.0.0.1 &
+          for i in $(seq 1 60); do curl -sf http://127.0.0.1:5173 > /dev/null && break; sleep 1; done
+          npm test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-screenshots
+          path: artifacts/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: dist/index.html
+
+  native:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node native/tools/ts2c.mjs
+      - run: make -C native check
+      - run: make -C native soft
+      - run: ./native/build/sandvoxel-headless 82413 0 1 60 320 200 native/build/ci-frame.ppm
+      - uses: actions/upload-artifact@v4
+        with:
+          name: native-headless
+          path: |
+            native/build/sandvoxel-headless
+            native/build/ci-frame.ppm
