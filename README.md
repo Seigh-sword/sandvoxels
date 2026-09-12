@@ -1,5 +1,12 @@
 # Sandvoxel
 
+[![ci](https://github.com/Seigh-sword/sandvoxels/actions/workflows/ci.yml/badge.svg)](https://github.com/Seigh-sword/sandvoxels/actions/workflows/ci.yml)
+[![release](https://github.com/Seigh-sword/sandvoxels/actions/workflows/release.yml/badge.svg)](https://github.com/Seigh-sword/sandvoxels/actions/workflows/release.yml)
+[![license](https://img.shields.io/badge/license-ISC-4d7634.svg)](LICENSE)
+[![core](https://img.shields.io/badge/core-typescript%20to%20c-7ec850.svg)](native/tools/ts2c.mjs)
+[![renderer](https://img.shields.io/badge/browser-webgl-74b7d0.svg)](src/game/engine.ts)
+[![play](https://img.shields.io/badge/play-sandvoxel.pages.dev-8a5a33.svg)](https://sandvoxel.pages.dev)
+
 Sandvoxel is a cozy voxel sandbox with a full pixel-art identity: bitmap type, hand-drawn pixel icons, a low-resolution WebGL canvas scaled up with nearest-neighbour filtering, and procedurally generated worlds you can build in, mine, and save.
 
 One portable TypeScript core drives every edition of the game. The browser renders it with WebGL through Three.js. Native editions compile that same core to C with a bundled TypeScript-to-C compiler and run it on SDL2 with OpenGL, or on a dependency-free software pixel renderer.
@@ -105,6 +112,16 @@ make -C native soft CC=aarch64-w64-mingw32-gcc
 | Web | WebGL | vite single-file build |
 
 `.github/workflows/ci.yml` runs the typecheck, the web build, a Playwright smoke test on desktop and mobile viewports, the TypeScript-to-C transpile, the differential core test, and a headless native frame render on every push.
+
+## Hosting on Cloudflare Pages
+
+The repository ships everything Cloudflare Pages needs:
+
+- `wrangler.toml` declares the project name and `dist` as the build output, so `wrangler pages deploy` and the Cloudflare dashboard both pick up the right directory. Build command `npm run build`, Node 22.
+- `public/_headers` sets nosniff, referrer, and permissions policies plus per-asset caching. It deliberately omits frame restrictions and a strict CSP: the single-file build inlines its script and style, and portals embed the game in iframes.
+- `public/_redirects` rewrites every path to `index.html` so deep links survive.
+- `public/manifest.webmanifest`, `icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, and `og.png` cover install metadata and link previews; `tools/make-icons.mjs` regenerates them from the pixel cube and the forest preview.
+- `.github/workflows/deploy-cloudflare.yml` deploys on manual dispatch using the `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` secrets: `npx wrangler pages deploy dist --project-name=sandvoxel` is the equivalent local command.
 
 ## Saves
 

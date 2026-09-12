@@ -1,0 +1,6 @@
+name = "sandvoxel"
+compatibility_date = "2026-09-01"
+pages_build_output_dir = "dist"
+
+[vars]
+GAME_TITLE = "Sandvoxel"
