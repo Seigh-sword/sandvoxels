@@ -14,16 +14,35 @@ int main(void) {
     PlayerState player;
     MoveInput input;
     HitResult hit;
+    TimeState ts;
+    WeatherState ws;
+    Survival sv;
+    MobSystem mobs;
     uint8_t * atlas;
     long long terrain = 0;
+    long long biomes = 0;
     long long atlasSum = 0;
     long long edits = 0;
+    double mobSum = 0;
     double posSum;
+    int slot0;
+    int slotEdit;
     int i;
+    int gx;
+    int gz;
 
     World_ctor(&world, 82413, BIOME_FOREST, MODE_CREATIVE);
-    for (i = 0; i < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; i++) terrain += world.data[i];
+
+    slot0 = (int)World_loadChunk(&world, 0, 0);
+    for (i = 0; i < CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT; i++) terrain += world.chunks[(int)sv_slotBase(slot0) + i];
     printf("terrain %lld\n", terrain);
+
+    for (gx = -3; gx <= 3; gx++) {
+        for (gz = -3; gz <= 3; gz++) {
+            biomes += (long long)(sv_biomeAt(BIOME_FOREST, gx * 91, gz * 91, 82413) * 13 + (gx + 4) * 7 + (gz + 4));
+        }
+    }
+    printf("biomes %lld\n", biomes);
 
     atlas = malloc((size_t)ATLAS_PX * TILE_PX * 4);
     sv_render_atlas_rgba(atlas);
@@ -31,14 +50,14 @@ int main(void) {
     printf("atlas %lld\n", atlasSum);
 
     MeshBuffer_ctor(&buffer, 16384);
-    sv_buildChunkMesh(&world, -40, -40, &buffer);
+    sv_buildChunkMesh(&world, 0, 0, &buffer);
     posSum = 0;
     for (i = 0; i < buffer.vertexCount * 3; i++) posSum += buffer.positions[i];
-    printf("mesh -40 -40 %d %d %lld\n", (int)buffer.vertexCount, (int)buffer.indexCount, (long long)round3(posSum));
-    sv_buildChunkMesh(&world, -24, -8, &buffer);
+    printf("mesh 0 0 %d %d %lld\n", (int)buffer.vertexCount, (int)buffer.indexCount, (long long)round3(posSum));
+    sv_buildChunkMesh(&world, 2, -1, &buffer);
     posSum = 0;
     for (i = 0; i < buffer.vertexCount * 3; i++) posSum += buffer.positions[i];
-    printf("mesh -24 -8 %d %d %lld\n", (int)buffer.vertexCount, (int)buffer.indexCount, (long long)round3(posSum));
+    printf("mesh 2 -1 %d %d %lld\n", (int)buffer.vertexCount, (int)buffer.indexCount, (long long)round3(posSum));
 
     PlayerState_ctor(&player, 11.5, World_surface(&world, 11, 17) + EYE_HEIGHT + 1.05, 17.5);
     player.yaw = 0.6;
@@ -62,22 +81,64 @@ int main(void) {
         player.grounded ? 1 : 0, player.flying ? 1 : 0);
 
     {
-        int surfaceA = World_surface(&world, 11, 17);
-        int surfaceB = World_surface(&world, 12, 17);
+        int surfaceA = (int)World_surface(&world, 11, 17);
+        int surfaceB = (int)World_surface(&world, 12, 17);
         World_edit(&world, 11, surfaceA, 17, 9);
         World_edit(&world, 12, surfaceB + 1, 17, 0);
     }
-    for (i = 0; i < WORLD_SIZE * WORLD_SIZE * WORLD_HEIGHT; i++) edits += world.data[i];
+    slotEdit = (int)World_loadChunk(&world, 0, 1);
+    for (i = 0; i < CHUNK_SIZE * CHUNK_SIZE * WORLD_HEIGHT; i++) edits += world.chunks[(int)sv_slotBase(slotEdit) + i];
     printf("edits %lld\n", edits);
     printf("editcount %d\n", (int)world.editCount);
+
+    TimeState_ctor(&ts, 9);
+    for (i = 0; i < 6000; i++) TimeState_advance(&ts, 1.0 / 60.0);
+    printf("time %lld %d %lld %d\n", (long long)round3(ts.hour), (int)ts.day,
+        (long long)round3(TimeState_daylight(&ts)), TimeState_isNight(&ts) ? 1 : 0);
+
+    WeatherState_ctor(&ws);
+    for (i = 0; i < 4000; i++) WeatherState_advance(&ws, 1.0 / 60.0, 0);
+    printf("weather %d %lld %lld\n", (int)ws.weather, (long long)round3(ws.timer), (long long)round3(ws.intensity));
+
+    Survival_ctor(&sv);
+    for (i = 0; i < 3600; i++) Survival_tick(&sv, 1.0 / 60.0, 0, 0, 1);
+    Survival_damage(&sv, 3);
+    Survival_eat(&sv, 5);
+    Survival_drink(&sv, 4);
+    printf("survival %lld %lld %lld %d\n", (long long)round3(sv.health), (long long)round3(sv.hunger),
+        (long long)round3(sv.thirst), sv.dead ? 1 : 0);
+
+    MobSystem_ctor(&mobs);
+    for (i = 0; i < 20; i++) MobSystem_spawn(&mobs, &world, 11.5, 30, 17.5, i % 2 == 0);
+    for (i = 0; i < 300; i++) MobSystem_update(&mobs, &world, 1.0 / 60.0, 11.5, 17.5, 1);
+    for (i = 0; i < MOB_MAX; i++) {
+        if (mobs.active[i]) mobSum += mobs.px[i] + mobs.pz[i];
+    }
+    printf("mobs %d %lld\n", (int)MobSystem_aliveCount(&mobs), (long long)round3(mobSum));
 
     free(atlas);
     free(buffer.positions);
     free(buffer.normals);
     free(buffer.uvs);
     free(buffer.indices);
-    free(world.data);
-    free(world.editKeys);
+    free(world.chunks);
+    free(world.slotKey);
+    free(world.slotUsed);
+    free(world.slotTick);
+    free(world.hashMap);
+    free(world.editXZ);
+    free(world.editY);
     free(world.editValues);
+    free(mobs.active);
+    free(mobs.kind);
+    free(mobs.px);
+    free(mobs.py);
+    free(mobs.pz);
+    free(mobs.vy);
+    free(mobs.yaw);
+    free(mobs.hp);
+    free(mobs.timer);
+    free(mobs.hurt);
+    free(mobs.attackTimer);
     return 0;
 }

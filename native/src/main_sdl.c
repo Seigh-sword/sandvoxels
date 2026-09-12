@@ -10,7 +10,8 @@
 
 #define WINDOW_W 960
 #define WINDOW_H 600
-#define CHUNKS 25
+#define VIEW_R 4
+#define CHUNK_SLOTS ((2 * VIEW_R + 1) * (2 * VIEW_R + 1))
 
 typedef struct ChunkMesh {
     GLfloat * positions;
@@ -19,16 +20,24 @@ typedef struct ChunkMesh {
     GLuint * indices;
     int vertexCount;
     int indexCount;
+    int cx;
+    int cz;
 } ChunkMesh;
 
-static ChunkMesh meshes[CHUNKS];
+static ChunkMesh meshes[CHUNK_SLOTS];
 static World world;
 static PlayerState player;
 static MoveInput input;
 static HitResult hit;
 static GLuint atlasTexture = 0;
 static int selected = 1;
+static double hour = 9.0;
+static int weather = WEATHER_CLEAR;
 static const char * savePath = "sandvoxel.sav";
+
+static int slotIndex(int dx, int dz) {
+    return (dx + VIEW_R) * (2 * VIEW_R + 1) + (dz + VIEW_R);
+}
 
 static void rebuildChunk(int slot, int cx, int cz) {
     MeshBuffer buffer;
@@ -52,31 +61,55 @@ static void rebuildChunk(int slot, int cx, int cz) {
     for (i = 0; i < buffer.indexCount; i++) mesh->indices[i] = (GLuint)buffer.indices[i];
     mesh->vertexCount = buffer.vertexCount;
     mesh->indexCount = buffer.indexCount;
+    mesh->cx = cx;
+    mesh->cz = cz;
     free(buffer.positions);
     free(buffer.normals);
     free(buffer.uvs);
     free(buffer.indices);
 }
 
-static void rebuildAll(void) {
-    int slot = 0;
-    int x, z;
-    for (x = -WORLD_HALF; x < WORLD_HALF; x += CHUNK_SIZE) {
-        for (z = -WORLD_HALF; z < WORLD_HALF; z += CHUNK_SIZE) {
-            rebuildChunk(slot++, x, z);
+static void updateWindow(void) {
+    const int pcx = (int)sv_chunkOf(player.x);
+    const int pcz = (int)sv_chunkOf(player.z);
+    int dx, dz;
+    for (dx = -VIEW_R; dx <= VIEW_R; dx++) {
+        for (dz = -VIEW_R; dz <= VIEW_R; dz++) {
+            const int slot = slotIndex(dx, dz);
+            if (meshes[slot].indexCount > 0 && meshes[slot].cx == pcx + dx && meshes[slot].cz == pcz + dz) continue;
+            rebuildChunk(slot, pcx + dx, pcz + dz);
         }
     }
 }
 
 static void rebuildAround(int bx, int bz) {
-    int slot = 0;
-    int x, z;
-    for (x = -WORLD_HALF; x < WORLD_HALF; x += CHUNK_SIZE) {
-        for (z = -WORLD_HALF; z < WORLD_HALF; z += CHUNK_SIZE) {
-            int touches = bx >= x - 1 && bx <= x + CHUNK_SIZE && bz >= z - 1 && bz <= z + CHUNK_SIZE;
-            if (touches) rebuildChunk(slot, x, z);
-            slot++;
+    const int pcx = (int)sv_chunkOf(player.x);
+    const int pcz = (int)sv_chunkOf(player.z);
+    const int cx = (int)sv_chunkOf(bx);
+    const int cz = (int)sv_chunkOf(bz);
+    const int lx = bx - cx * CHUNK_SIZE;
+    const int lz = bz - cz * CHUNK_SIZE;
+    int dx, dz;
+    for (dx = -1; dx <= 1; dx++) {
+        for (dz = -1; dz <= 1; dz++) {
+            if (dx != 0 && !((dx < 0 && lx == 0) || (dx > 0 && lx == CHUNK_SIZE - 1))) continue;
+            if (dz != 0 && !((dz < 0 && lz == 0) || (dz > 0 && lz == CHUNK_SIZE - 1))) continue;
+            if (abs(cx + dx - pcx) > VIEW_R || abs(cz + dz - pcz) > VIEW_R) continue;
+            rebuildChunk(slotIndex(cx + dx - pcx, cz + dz - pcz), cx + dx, cz + dz);
         }
+    }
+}
+
+static void act(int place) {
+    sv_raycast(&world, &player, 8, 0.045, &hit);
+    if (!hit.found) return;
+    {
+        int x = hit.x, y = hit.y, z = hit.z;
+        if (place) { x = hit.prevX; y = hit.prevY; z = hit.prevZ; }
+        if (y < 1 || y >= WORLD_HEIGHT) return;
+        if (place && sv_overlapsPlayer(&player, x, y, z)) return;
+        World_edit(&world, x, y, z, place ? selected : 0);
+        rebuildAround(x, z);
     }
 }
 
@@ -94,19 +127,6 @@ static void uploadAtlas(void) {
     free(atlas);
 }
 
-static void act(int place) {
-    sv_raycast(&world, &player, 8, 0.045, &hit);
-    if (!hit.found) return;
-    {
-        int x = hit.x, y = hit.y, z = hit.z;
-        if (place) { x = hit.prevX; y = hit.prevY; z = hit.prevZ; }
-        if (y < 1 || y >= WORLD_HEIGHT || x < -WORLD_HALF || x >= WORLD_HALF || z < -WORLD_HALF || z >= WORLD_HALF) return;
-        if (place && sv_overlapsPlayer(&player, x, y, z)) return;
-        World_edit(&world, x, y, z, place ? selected : 0);
-        rebuildAround(x, z);
-    }
-}
-
 static void perspective(double fovDegrees, double aspect, double near, double far) {
     const double focal = 1.0 / tan(fovDegrees * 0.5 * 3.141592653589793 / 180.0);
     glMatrixMode(GL_PROJECTION);
@@ -122,6 +142,8 @@ int main(int argc, char ** argv) {
     SDL_Window * window;
     SDL_GLContext gl;
     int running = 1;
+    int lastCX = 1 << 30;
+    int lastCZ = 1 << 30;
     Uint32 previous = 0;
     Uint32 lastSave = 0;
     Uint32 lastReport = 0;
@@ -146,12 +168,14 @@ int main(int argc, char ** argv) {
     gl = SDL_GL_CreateContext(window);
     SDL_SetRelativeMouseMode(SDL_TRUE);
 
+    memset(meshes, 0, sizeof(meshes));
+    for (int s = 0; s < CHUNK_SLOTS; s++) { meshes[s].cx = 1 << 30; meshes[s].cz = 1 << 30; }
     World_ctor(&world, seed, biome, mode);
     PlayerState_ctor(&player, 11.5, World_surface(&world, 11, 17) + EYE_HEIGHT + 1.05, 17.5);
     MoveInput_ctor(&input);
     HitResult_ctor(&hit);
-    sv_save_read(savePath, &world, &player);
-    rebuildAll();
+    sv_save_read(savePath, &world, &player, &hour, &weather);
+    updateWindow();
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_TEXTURE_2D);
@@ -161,8 +185,6 @@ int main(int argc, char ** argv) {
     glEnableClientState(GL_VERTEX_ARRAY);
     glEnableClientState(GL_NORMAL_ARRAY);
     glEnableClientState(GL_TEXTURE_COORD_ARRAY);
-    if (world.biome == BIOME_DESERT) glClearColor(0.914f, 0.776f, 0.627f, 1.0f);
-    else glClearColor(0.690f, 0.835f, 0.875f, 1.0f);
 
     previous = SDL_GetTicks();
     lastSave = previous;
@@ -172,6 +194,8 @@ int main(int argc, char ** argv) {
         SDL_Event event;
         Uint32 now = SDL_GetTicks();
         double dt = (now - previous) / 1000.0;
+        int pcx, pcz, sky, camBiome;
+        double day, dim, light, skyR, skyG, skyB;
         if (dt > 0.035) dt = 0.035;
         previous = now;
         while (SDL_PollEvent(&event)) {
@@ -180,7 +204,7 @@ int main(int argc, char ** argv) {
                 int w, h;
                 SDL_GetWindowSize(window, &w, &h);
                 glViewport(0, 0, w, h);
-                perspective(75.0, (double)w / (double)h, 0.05, 150.0);
+                perspective(75.0, (double)w / (double)h, 0.05, 220.0);
             } else if (event.type == SDL_KEYDOWN) {
                 switch (event.key.keysym.sym) {
                     case SDLK_ESCAPE: running = 0; break;
@@ -223,15 +247,41 @@ int main(int argc, char ** argv) {
             player.z = 17.5;
             player.velocityY = 0;
         }
+        hour += dt * 0.05;
+        while (hour >= 24.0) hour -= 24.0;
+
+        pcx = (int)sv_chunkOf(player.x);
+        pcz = (int)sv_chunkOf(player.z);
+        if (pcx != lastCX || pcz != lastCZ) {
+            lastCX = pcx;
+            lastCZ = pcz;
+            updateWindow();
+        }
+
+        camBiome = (int)sv_biomeAt(world.biome, (int)floor(player.x), (int)floor(player.z), world.seed);
+        sky = (int)sv_biomeSky(camBiome);
+        {
+            double a = (hour - 6.0) / 12.0 * 3.141592653589793;
+            day = 0.2 + sin(a) * 1.3;
+            if (day < 0.07) day = 0.07;
+            if (day > 1.0) day = 1.0;
+        }
+        dim = weather == WEATHER_STORM ? 0.45 : weather == WEATHER_RAIN ? 0.62 : weather == WEATHER_SNOW ? 0.78 : 1.0;
+        skyR = (11.0 + (((sky >> 16) & 255) - 11.0) * day) * (0.35 + 0.65 * dim) / 255.0;
+        skyG = (16.0 + (((sky >> 8) & 255) - 16.0) * day) * (0.35 + 0.65 * dim) / 255.0;
+        skyB = (38.0 + ((sky & 255) - 38.0) * day) * (0.35 + 0.65 * dim) / 255.0;
+        glClearColor((GLfloat)skyR, (GLfloat)skyG, (GLfloat)skyB, 1.0f);
+        light = 0.32 + 0.68 * day * dim;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
         glRotated(-player.pitch * 180.0 / 3.141592653589793, 1, 0, 0);
         glRotated(-player.yaw * 180.0 / 3.141592653589793, 0, 1, 0);
         glTranslated(-player.x, -player.y, -player.z);
+        glColor4f((GLfloat)light, (GLfloat)light, (GLfloat)light, 1.0f);
         {
             int slot;
-            for (slot = 0; slot < CHUNKS; slot++) {
+            for (slot = 0; slot < CHUNK_SLOTS; slot++) {
                 ChunkMesh * mesh = &meshes[slot];
                 if (!mesh->indexCount) continue;
                 glVertexPointer(3, GL_FLOAT, 0, mesh->positions);
@@ -240,17 +290,20 @@ int main(int argc, char ** argv) {
                 glDrawElements(GL_TRIANGLES, mesh->indexCount, GL_UNSIGNED_INT, mesh->indices);
             }
         }
-        if (world.biome != BIOME_DESERT) {
+        {
+            int water = (int)sv_biomeWater(camBiome);
+            double wx = floor(player.x / 4.0) * 4.0;
+            double wz = floor(player.z / 4.0) * 4.0;
             glDisable(GL_TEXTURE_2D);
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glDepthMask(GL_FALSE);
-            glColor4f(0.28f, 0.62f, 0.72f, 0.72f);
+            glColor4f((GLfloat)((((water >> 16) & 255) / 255.0) * light), (GLfloat)((((water >> 8) & 255) / 255.0) * light), (GLfloat)(((water & 255) / 255.0) * light), 0.72f);
             glBegin(GL_QUADS);
-            glVertex3f((GLfloat)-WORLD_HALF, 2.7f, (GLfloat)-WORLD_HALF);
-            glVertex3f((GLfloat)WORLD_HALF, 2.7f, (GLfloat)-WORLD_HALF);
-            glVertex3f((GLfloat)WORLD_HALF, 2.7f, (GLfloat)WORLD_HALF);
-            glVertex3f((GLfloat)-WORLD_HALF, 2.7f, (GLfloat)WORLD_HALF);
+            glVertex3f((GLfloat)(wx - 120), (GLfloat)WATER_Y, (GLfloat)(wz - 120));
+            glVertex3f((GLfloat)(wx + 120), (GLfloat)WATER_Y, (GLfloat)(wz - 120));
+            glVertex3f((GLfloat)(wx + 120), (GLfloat)WATER_Y, (GLfloat)(wz + 120));
+            glVertex3f((GLfloat)(wx - 120), (GLfloat)WATER_Y, (GLfloat)(wz + 120));
             glEnd();
             glDepthMask(GL_TRUE);
             glDisable(GL_BLEND);
@@ -260,17 +313,17 @@ int main(int argc, char ** argv) {
         SDL_GL_SwapWindow(window);
         frames++;
         if (now - lastReport > 2000) {
-            printf("fps %u pos %d %d %d block %d\n", frames * 1000 / (now - lastReport), (int)player.x, (int)player.y, (int)player.z, selected);
+            printf("fps %u pos %d %d %d block %d hour %d\n", frames * 1000 / (now - lastReport), (int)player.x, (int)player.y, (int)player.z, selected, (int)hour);
             frames = 0;
             lastReport = now;
         }
         if (now - lastSave > 15000) {
-            sv_save_write(savePath, &world, &player);
+            sv_save_write(savePath, &world, &player, hour, weather);
             lastSave = now;
         }
     }
 
-    sv_save_write(savePath, &world, &player);
+    sv_save_write(savePath, &world, &player, hour, weather);
     printf("saved to %s\n", savePath);
     SDL_GL_DeleteContext(gl);
     SDL_DestroyWindow(window);

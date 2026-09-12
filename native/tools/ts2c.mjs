@@ -8,10 +8,14 @@ const root = path.resolve(here, '../..');
 const outDir = path.join(root, 'native/generated');
 
 const SOURCES = [
+  'src/core/noise.ts',
   'src/core/palette.ts',
   'src/core/world.ts',
   'src/core/mesh.ts',
   'src/core/player.ts',
+  'src/core/time.ts',
+  'src/core/mobs.ts',
+  'src/core/survival.ts',
 ];
 
 const T_NUM = { kind: 'num' };
@@ -357,7 +361,7 @@ function translate(em) {
   function mathCall(method, args) {
     const map = {
       floor: 'floor', ceil: 'ceil', sin: 'sin', cos: 'cos', sqrt: 'sqrt',
-      abs: 'fabs', max: 'fmax', min: 'fmin', round: 'round',
+      abs: 'fabs', max: 'fmax', min: 'fmin', round: 'round', atan2: 'atan2',
     };
     if (method === 'imul') return `(int32_t)((int64_t)${intCast(args[0])} * (int64_t)${intCast(args[1])})`;
     if (!map[method]) throw new Error('unsupported Math.' + method);

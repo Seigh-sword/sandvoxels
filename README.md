@@ -7,7 +7,7 @@
 [![renderer](https://img.shields.io/badge/browser-webgl-74b7d0.svg)](src/game/engine.ts)
 [![play](https://img.shields.io/badge/play-sandvoxel.pages.dev-8a5a33.svg)](https://sandvoxel.pages.dev)
 
-Sandvoxel is a cozy voxel sandbox with a full pixel-art identity: bitmap type, hand-drawn pixel icons, a low-resolution WebGL canvas scaled up with nearest-neighbour filtering, and procedurally generated worlds you can build in, mine, and save.
+Sandvoxel is a cozy voxel sandbox with a full pixel-art identity: bitmap type, hand-drawn 16x16 two-tone pixel icons, and a low-resolution WebGL canvas scaled up with nearest-neighbour filtering. Worlds are endless: chunks stream in as you walk through nine blending biomes, days turn into nights, rain and snow roll in, rabbits and deer roam the fields while shades hunt after dark, and Explorer mode asks you to keep your health, hunger, and thirst in check.
 
 One portable TypeScript core drives every edition of the game. The browser renders it with WebGL through Three.js. Native editions compile that same core to C with a bundled TypeScript-to-C compiler and run it on SDL2 with OpenGL, or on a dependency-free software pixel renderer.
 
@@ -38,8 +38,10 @@ The result is `dist/index.html`, which is also the artifact you would upload to 
 | Look | Mouse or drag | Drag anywhere |
 | Jump / fly up | Space | Jump button |
 | Descend | Q | Down button |
-| Mine | Left click or R | Mine button |
+| Mine / attack | Left click or R | Mine button |
 | Build | Right click or E | Build button |
+| Eat (Explorer) | G | Eat button |
+| Drink (Explorer) | T | Drink button |
 | Choose block | 1-9 or scroll | Hotbar tap |
 | Fly toggle | F | Fly button |
 | Sprint | Shift | - |
@@ -53,10 +55,14 @@ Touch controls are detected automatically through pointer and touch capability, 
 
 `src/core/` holds everything that defines the simulation, with no DOM, no Three.js, and no strings:
 
+- `noise.ts`: integer-exact hashing and the deterministic random stream shared by weather and mobs.
 - `palette.ts`: block ids, atlas tiles, and the 16x16 texture atlas rasterizer.
-- `world.ts`: seeded value-noise terrain, biomes, trees, rivers, and the edit journal.
-- `mesh.ts`: greedy-free chunk mesher emitting positions, normals, uvs, and indices.
+- `world.ts`: infinite chunk streaming with a slot table, nine biomes with zone blending, trees, rivers, ice, and the edit journal that remembers every change anywhere in the world.
+- `mesh.ts`: chunk mesher with a fast neighbour-slot path, emitting positions, normals, uvs, and indices.
 - `player.ts`: collision, walking, jumping, flying, and voxel raycasting.
+- `time.ts`: the day and night cycle plus the weather state machine with lightning.
+- `mobs.ts`: rabbits, deer, and night shades with wandering, chasing, and drops.
+- `survival.ts`: health, hunger, thirst, air, fall damage, and drowning for Explorer mode.
 
 The browser engine (`src/game/engine.ts`) uploads the core's meshes and atlas to WebGL. The native build transpiles the same files to C.
 
@@ -86,7 +92,7 @@ make -C native soft   # libc only
 ./native/build/sandvoxel-headless 82413 0 1 60 320 200 frame.ppm
 ```
 
-Arguments are: seed, biome (0 forest, 1 desert, 2 alpine), mode (0 explorer, 1 creative), ticks, width, height, output path, optional save file.
+Arguments are: seed, biome (0 forest, 1 plains, 2 desert, 3 alpine, 4 tundra, 5 swamp, 6 savanna, 7 badlands, 8 jungle), mode (0 explorer, 1 creative), ticks, width, height, output path, optional save file, optional hour, optional weather.
 
 Cross-compiling is just a different `CC`:
 

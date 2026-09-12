@@ -1,4 +1,4 @@
-import { EYE_HEIGHT, WORLD_HALF, WORLD_HEIGHT, World } from './world';
+import { EYE_HEIGHT, WORLD_HEIGHT, World } from './world';
 
 export class PlayerState {
   x: number;
@@ -82,7 +82,6 @@ export function lookDelta(state: PlayerState, dx: number, dy: number, sensitivit
 }
 
 function collides(world: World, x: number, y: number, z: number): boolean {
-  if (x < -WORLD_HALF + 0.3 || x > WORLD_HALF - 0.3 || z < -WORLD_HALF + 0.3 || z > WORLD_HALF - 0.3) return true;
   for (let bx = Math.floor(x - 0.25); bx <= Math.floor(x + 0.25); bx++) {
     for (let bz = Math.floor(z - 0.25); bz <= Math.floor(z + 0.25); bz++) {
       for (let by = Math.floor(y - EYE_HEIGHT + 0.02); by <= Math.floor(y + 0.1); by++) {

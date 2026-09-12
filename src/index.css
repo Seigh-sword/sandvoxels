@@ -1126,3 +1126,178 @@ input[type="range"]::-moz-range-thumb { width: 14px; height: 20px; background: v
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+.game-clock {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: rgba(16, 19, 12, 0.72);
+  border: 2px solid var(--green-dark);
+  padding: 7px 12px;
+  pointer-events: none;
+}
+.game-clock .clock-icon { display: inline-flex; color: var(--white); }
+.game-clock .clock-text { display: flex; flex-direction: column; gap: 3px; }
+.game-clock .clock-text strong { font-family: var(--font-display); font-size: 10px; color: var(--white); text-shadow: 2px 2px 0 var(--shadow); }
+.game-clock .clock-text span { font-family: var(--font-body); font-size: 14px; color: var(--paper-2); }
+
+.stat-bars {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 148px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  pointer-events: none;
+}
+.stat-row { display: flex; gap: 3px; }
+.stat-seg { display: inline-flex; filter: drop-shadow(2px 2px 0 rgba(10, 12, 8, 0.85)); }
+.stat-seg.full { opacity: 1; }
+.stat-seg.half { opacity: 0.65; }
+.stat-seg.empty { opacity: 0.22; }
+.air-row { margin-bottom: 2px; }
+
+.underwater-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: rgba(28, 92, 130, 0.42);
+  box-shadow: inset 0 0 120px rgba(10, 40, 60, 0.6);
+}
+.hurt-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  box-shadow: inset 0 0 110px rgba(190, 40, 40, 0.65);
+  animation: hurt-pulse 0.35s ease-out;
+}
+@keyframes hurt-pulse {
+  from { opacity: 1; }
+  to { opacity: 0.45; }
+}
+
+.death-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(12, 8, 10, 0.72);
+}
+.death-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+  background: var(--paper);
+  border: 3px solid var(--shadow);
+  box-shadow: 6px 6px 0 var(--shadow);
+  padding: 28px 34px;
+  max-width: 420px;
+  color: var(--ink);
+}
+.death-card h2 { font-family: var(--font-display); font-size: 16px; }
+.death-card p { font-family: var(--font-body); font-size: 16px; color: var(--ink-soft, #5a5a4a); }
+
+.game-event-toast {
+  position: absolute;
+  left: 50%;
+  top: 84px;
+  transform: translateX(-50%);
+  z-index: 6;
+  font-family: var(--font-body);
+  font-size: 15px;
+  color: var(--white);
+  background: rgba(16, 19, 12, 0.78);
+  border: 2px solid var(--green-dark);
+  padding: 7px 14px;
+  pointer-events: none;
+  animation: toast-in 0.18s ease-out;
+}
+@keyframes toast-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.survival-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--paper-2);
+  background: rgba(16, 19, 12, 0.35);
+  border: 2px solid var(--green-dark);
+  padding: 8px 10px;
+  margin-top: 10px;
+}
+
+.biome-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.biome-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 3px solid var(--shadow);
+  background: var(--paper-2);
+  padding: 7px 9px;
+  box-shadow: 3px 3px 0 var(--shadow);
+  text-align: left;
+}
+.biome-chip .chip-swatch {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  border: 2px solid var(--shadow);
+  background: linear-gradient(160deg, var(--chip-top) 0 55%, var(--chip-side) 55% 100%);
+  color: var(--shadow);
+}
+.biome-chip .chip-name {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  color: var(--ink);
+}
+.biome-chip:hover { transform: translate(-1px, -1px); box-shadow: 4px 4px 0 var(--shadow); }
+.biome-chip.selected { background: var(--green); }
+.biome-chip.selected .chip-name { color: var(--white); }
+.biome-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 9px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--ink-soft, #5a5a4a);
+}
+
+.biome-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 120px;
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.06) 0 6px, rgba(0, 0, 0, 0) 6px 12px),
+    linear-gradient(165deg, var(--chip-top) 0 58%, var(--chip-side) 58% 100%);
+  color: rgba(20, 24, 16, 0.75);
+}
+.biome-swatch.tall { height: 130px; }
+.world-image-button:hover .biome-swatch { filter: brightness(1.08); }
+.discover-image > .biome-swatch { position: static; left: auto; bottom: auto; border: 0; }

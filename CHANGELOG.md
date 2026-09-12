@@ -2,6 +2,25 @@
 
 All notable changes to Sandvoxel are documented here. The format follows Keep a Changelog, and the project adheres to semantic versioning.
 
+## 1.2.0 - Living Worlds
+
+### Added
+
+- Infinite worlds: chunks stream around the player in both the browser and native editions, and the edit journal replays your changes in any chunk that is ever generated again.
+- Nine biomes with zone blending: Forest, Plains, Desert, Alpine, Tundra, Swamp, Savanna, Badlands, and Jungle, with cactus, giant mushrooms, ice, mud, and savanna grass blocks.
+- Day and night cycle with sun, moon, stars, and shifting sky colors per biome.
+- Weather: rain, snow, and thunderstorms with lightning flashes, thunder audio, and fog that closes in.
+- Wildlife: rabbits and deer by day, hunting shades by night. Fight back and gather food from what you defeat.
+- Explorer survival: health, hunger, and thirst with foraging (G), drinking (T), fall damage, drowning, and respawn.
+- Survival HUD: heart, food, water, and air bars plus a clock card with day, time, weather, and biome.
+- Every icon redrawn at 16x16 with two-tone accent colors, plus new weather and survival glyphs.
+- Biome picker with nine swatch chips and a Discover page showing every biome.
+
+### Changed
+
+- Native saves moved to the SVX2 format carrying time of day and weather alongside edits.
+- Legacy browser saves keep working: old fixed-world edits are decoded into the new journal.
+
 ## 1.1.0 - Pixel Edition
 
 ### Added

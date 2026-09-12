@@ -6,19 +6,45 @@ void sv_render_atlas_rgba(uint8_t * out) {
     sv_renderAtlas(out);
 }
 
-static void sky_color(int biome, double * r, double * g, double * b) {
-    if (biome == BIOME_DESERT) {
-        *r = 233; *g = 198; *b = 160;
-    } else {
-        *r = 176; *g = 213; *b = 223;
-    }
+static double daylight_at(double hour) {
+    double a = (hour - 6.0) / 12.0 * 3.141592653589793;
+    double value = 0.2 + sin(a) * 1.3;
+    if (value < 0.07) value = 0.07;
+    if (value > 1.0) value = 1.0;
+    return value;
+}
+
+static double weather_dim(int weather) {
+    if (weather == WEATHER_STORM) return 0.45;
+    if (weather == WEATHER_RAIN) return 0.62;
+    if (weather == WEATHER_SNOW) return 0.78;
+    return 1.0;
+}
+
+static void sky_color(World * world, PlayerState * player, double hour, int weather, double * r, double * g, double * b) {
+    int biome = (int)sv_biomeAt(world->biome, (int)floor(player->x), (int)floor(player->z), world->seed);
+    int sky = (int)sv_biomeSky(biome);
+    double sr = (double)((sky >> 16) & 255);
+    double sg = (double)((sky >> 8) & 255);
+    double sb = (double)(sky & 255);
+    double day = daylight_at(hour);
+    double dim = weather_dim(weather);
+    double night = 1.0 - day;
+    sr = 11.0 + (sr - 11.0) * day;
+    sg = 16.0 + (sg - 16.0) * day;
+    sb = 38.0 + (sb - 38.0) * day;
+    sr *= 0.35 + 0.65 * dim;
+    sg *= 0.35 + 0.65 * dim;
+    sb *= 0.35 + 0.65 * dim;
+    (void)night;
+    *r = sr; *g = sg; *b = sb;
 }
 
 static double frac(double value) {
     return value - floor(value);
 }
 
-void sv_render_frame(World * world, PlayerState * player, uint8_t * atlas, uint8_t * frame, int width, int height, double fov) {
+void sv_render_frame(World * world, PlayerState * player, uint8_t * atlas, uint8_t * frame, int width, int height, double fov, double hour, int weather) {
     const double aspect = (double)width / (double)height;
     const double focal = 1.0 / tan(fov * 0.5 * 3.141592653589793 / 180.0);
     const double cosPitch = cos(player->pitch);
@@ -31,8 +57,9 @@ void sv_render_frame(World * world, PlayerState * player, uint8_t * atlas, uint8
     const double upY = cos(player->pitch);
     const double upZ = -cos(player->yaw) * (-sin(player->pitch));
     double sr, sg, sb;
+    double lightScale = 0.32 + 0.68 * daylight_at(hour) * weather_dim(weather);
     int px, py;
-    sky_color(world->biome, &sr, &sg, &sb);
+    sky_color(world, player, hour, weather, &sr, &sg, &sb);
     for (py = 0; py < height; py++) {
         for (px = 0; px < width; px++) {
             const double nx = (2.0 * (px + 0.5) / width - 1.0) * aspect / focal;
@@ -74,7 +101,7 @@ void sv_render_frame(World * world, PlayerState * player, uint8_t * atlas, uint8
                         const int tile = (int)sv_tileForBlock(block, face);
                         double u, v;
                         int tx, ty, ai;
-                        double light = face == FACE_PY ? 1.0 : face == FACE_NY ? 0.5 : (face == FACE_PX || face == FACE_NX) ? 0.78 : 0.66;
+                        double light = (face == FACE_PY ? 1.0 : face == FACE_NY ? 0.5 : (face == FACE_PX || face == FACE_NX) ? 0.78 : 0.66) * lightScale;
                         double hitX = player->x + rx * dist;
                         double hitY = player->y + ry * dist;
                         double hitZ = player->z + rz * dist;

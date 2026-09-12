@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, WORLD_HALF, WORLD_HEIGHT, World } from './world';
+import { CHUNK_SIZE, WORLD_HEIGHT, World, slotBase } from './world';
 import { ATLAS_COLS, TILE_PX, tileForBlock } from './palette';
 
 const FACE_DIR_X = [1, -1, 0, 0, 0, 0];
@@ -105,18 +105,38 @@ export class MeshBuffer {
 }
 
 export function chunkOf(value: number): number {
-  return Math.floor((value + WORLD_HALF) / CHUNK_SIZE) * CHUNK_SIZE - WORLD_HALF;
+  return Math.floor(value / CHUNK_SIZE);
+}
+
+export function fastRead(world: World, centers: Int32Array, cx: number, cz: number, x: number, y: number, z: number): number {
+  if (y < 0 || y >= WORLD_HEIGHT) return 0;
+  const qx = Math.floor(x / CHUNK_SIZE);
+  const qz = Math.floor(z / CHUNK_SIZE);
+  const ox = qx - cx + 1;
+  const oz = qz - cz + 1;
+  if (ox < 0 || ox > 2 || oz < 0 || oz > 2) return world.getBlock(x, y, z);
+  const lx = x - qx * CHUNK_SIZE;
+  const lz = z - qz * CHUNK_SIZE;
+  return world.chunks[centers[ox * 3 + oz] + lx + lz * CHUNK_SIZE + y * CHUNK_SIZE * CHUNK_SIZE];
 }
 
 export function buildChunkMesh(world: World, cx: number, cz: number, out: MeshBuffer): void {
   out.reset();
-  for (let x = cx; x < cx + CHUNK_SIZE; x++) {
-    for (let z = cz; z < cz + CHUNK_SIZE; z++) {
+  const centers = new Int32Array(9);
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      centers[(dx + 1) * 3 + (dz + 1)] = slotBase(world.loadChunk(cx + dx, cz + dz));
+    }
+  }
+  const minX = cx * CHUNK_SIZE;
+  const minZ = cz * CHUNK_SIZE;
+  for (let x = minX; x < minX + CHUNK_SIZE; x++) {
+    for (let z = minZ; z < minZ + CHUNK_SIZE; z++) {
       for (let y = 0; y < WORLD_HEIGHT; y++) {
-        const block = world.getBlock(x, y, z);
+        const block = fastRead(world, centers, cx, cz, x, y, z);
         if (block === 0) continue;
         for (let face = 0; face < 6; face++) {
-          const neighbor = world.getBlock(x + FACE_DIR_X[face], y + FACE_DIR_Y[face], z + FACE_DIR_Z[face]);
+          const neighbor = fastRead(world, centers, cx, cz, x + FACE_DIR_X[face], y + FACE_DIR_Y[face], z + FACE_DIR_Z[face]);
           if (neighbor !== 0) continue;
           if (y === 0 && face === 3) continue;
           const tile = tileForBlock(block, face);
