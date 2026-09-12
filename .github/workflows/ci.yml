@@ -11,8 +11,8 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -25,12 +25,12 @@ jobs:
           npx vite --port 5173 --host 127.0.0.1 &
           for i in $(seq 1 60); do curl -sf http://127.0.0.1:5173 > /dev/null && break; sleep 1; done
           npm test
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: web-screenshots
           path: artifacts/
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: web-build
           path: dist/index.html
@@ -38,8 +38,8 @@ jobs:
   native:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -48,7 +48,7 @@ jobs:
       - run: make -C native check
       - run: make -C native soft
       - run: ./native/build/sandvoxel-headless 82413 0 1 60 320 200 native/build/ci-frame.ppm
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: native-headless
           path: |

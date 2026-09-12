@@ -55,8 +55,8 @@ jobs:
             cc: cc
             setup: brew install sdl2
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -83,7 +83,7 @@ jobs:
           cp LICENSE README.md package/
           if [ -f native/build/sandvoxel ]; then cp native/build/sandvoxel package/sandvoxel-${{ matrix.target }}; fi
           if [ -f native/build/sandvoxel-headless ]; then cp native/build/sandvoxel-headless package/sandvoxel-headless-${{ matrix.target }}; fi
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sandvoxel-${{ matrix.target }}
           path: package/
@@ -91,8 +91,8 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -103,7 +103,7 @@ jobs:
           cp dist/index.html package/index.html
           cp LICENSE README.md package/
           (cd package && zip -r ../sandvoxel-web.zip .)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sandvoxel-web
           path: sandvoxel-web.zip
@@ -113,7 +113,7 @@ jobs:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: artifacts
       - run: |
